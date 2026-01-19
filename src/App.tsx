@@ -1,117 +1,110 @@
 import { useState } from 'react'
 import './App.css'
 
-// --- 型定義 (Cの構造体) ---
-interface Copic {
-  id: number;
-  color: string;
-  x: number;
-  y: number;
-  isGrouped: boolean;
-}
+// --- 型定義はそのまま ---
+interface Copic { id: number; color: string; x: number; y: number; isGrouped: boolean; boxId: number | null; }
 
-interface Box {
-  id: number;
-  color: string;
-}
+// 1. キャンバス部分を別の関数（部品）として切り出す
+function CopicCanvas({ unit, count }: { unit: number, count: number }) {
+  const total = unit * count;
+  const colors = ['#FF7E79', '#FFD479', '#76D6FF', '#73FA79', '#D4A3FF'];
 
-function App() {
-  // --- 定数定義 ---
-  const unit = 4;
-  const count = 6;
-  const totalCount = unit * count;
-
-  // --- 状態(State)の定義 ---
-  const [copics, setCopics] = useState<Copic[]>(() => {
-    return Array.from({ length: totalCount }).map((_, i) => ({
+  // useStateの初期値としてランダム配置を作る（useEffectは不要！）
+  const [copics, setCopics] = useState<Copic[]>(() => 
+    Array.from({ length: total }).map((_, i) => ({
       id: i,
-      color: '#00bfa5',
-      x: Math.random() * 400 + 50,
-      y: Math.random() * 200 + 50,
+      color: colors[i % colors.length],
+      x: Math.random() * 500 + 50,
+      y: Math.random() * 100 + 300, // 下の方にばらまく
       isGrouped: false,
-    }));
-  });
+      boxId: null
+    }))
+  );
 
   const [selectedBoxId, setSelectedBoxId] = useState<number | null>(null);
 
-  // 箱のデータ
-  const boxes: Box[] = Array.from({ length: count }).map((_, i) => ({
-    id: i,
-    color: '#e0e0e0',
-  }));
+  // 数式の計算（Symbolic）
+  const groupedTotal = copics.filter(c => c.isGrouped).length;
+  const fullBoxes = Math.floor(groupedTotal / unit);
+  const remainder = total - (fullBoxes * unit);
 
-  // --- 操作(Enactive)のロジック --- 
-  const handleCopicClick = (id: number) => {
-    if (selectedBoxId === null) {
-      alert("まずは入れる箱を選んでね！");
-      return;
-    }
-
-    setCopics(prevCopics => prevCopics.map(copic => {
-      if (copic.id === id) {
-        return { 
-          ...copic, 
-          isGrouped: true, 
-          x: 20 + (selectedBoxId * 100), 
-          y: 100 
-        };
-      }
-      return copic;
-    }));
+  // 1箱の中での整列ロジック (Iconic)
+  const getPositionInBox = (boxId: number, indexInBox: number) => {
+    const boxX = 20 + (boxId * 110);
+    const row = Math.floor(indexInBox / 2);
+    const col = indexInBox % 2;
+    return { x: boxX + 25 + (col * 30), y: 70 + (row * 30) };
   };
 
-  // --- 写像 (UI) --- 
+  const handleCopicClick = (id: number) => {
+    if (selectedBoxId === null) return;
+    setCopics(prev => {
+      const inBox = prev.filter(c => c.boxId === selectedBoxId).length;
+      if (inBox >= unit) return prev; // 箱がいっぱいなら何もしない
+
+      return prev.map(c => {
+        if (c.id === id && !c.isGrouped) {
+          const pos = getPositionInBox(selectedBoxId, inBox);
+          return { ...c, isGrouped: true, boxId: selectedBoxId, x: pos.x, y: pos.y };
+        }
+        return c;
+      });
+    });
+  };
+
   return (
-    <div className="container">
-      <h1>Copic Builder</h1>
-      <p className="formula">
-        {unit} × {count} = {unit} × 5 + ?
-      </p>
+    <>
+      <div style={{ fontSize: '24px', fontWeight: 'bold', textAlign: 'center', marginBottom: '20px' }}>
+        {unit} × {count} = {unit} × {fullBoxes} + {remainder}
+      </div>
 
-      <div className="canvas" style={{ position: 'relative', height: '400px', border: '1px solid #ccc', overflow: 'hidden' }}>
-        
-        {/* 箱の描画 (Iconic) */}
-        <div className="boxes-layer">
-          {boxes.map(box => (
-            <div 
-              key={box.id}
-              onClick={() => setSelectedBoxId(box.id)}
-              style={{
-                width: '80px', 
-                height: '80px', 
-                border: `3px solid ${selectedBoxId === box.id ? 'orange' : '#ccc'}`,
-                display: 'inline-block', 
-                margin: '10px',
-                cursor: 'pointer'
-              }}
-            >
-              箱 {box.id + 1}
-            </div>
-          ))}
-        </div>
-
-        {/* コピックの描画 (Iconic) */}
-        {copics.map(copic => (
-          <div
-            key={copic.id}
-            onClick={() => handleCopicClick(copic.id)}
+      <div className="canvas" style={{ position: 'relative', height: '500px', border: '2px solid #333', background: '#fff' }}>
+        {/* 箱の表示 */}
+        {Array.from({ length: count }).map((_, i) => (
+          <div key={i} onClick={() => setSelectedBoxId(i)}
             style={{
-              position: 'absolute',
-              left: copic.x,
-              top: copic.y,
-              width: '24px',
-              height: '24px',
-              backgroundColor: copic.color,
-              borderRadius: '50%',
-              cursor: 'pointer',
-              transition: 'all 0.5s ease-out', // シュッと動くアニメーション
-              zIndex: 10
-            }}
-          />
+              position: 'absolute', left: 20 + (i * 110), top: 40,
+              width: '90px', height: '120px',
+              border: `4px solid ${selectedBoxId === i ? '#FF9500' : '#ddd'}`,
+              borderRadius: '8px'
+            }}>箱 {i + 1}</div>
+        ))}
+
+        {/* コピックの表示 */}
+        {copics.map(c => (
+          <div key={c.id} onClick={() => handleCopicClick(c.id)}
+            style={{
+              position: 'absolute', left: c.x, top: c.y,
+              width: '24px', height: '24px', borderRadius: '50%',
+              backgroundColor: c.isGrouped ? c.color : '#666',
+              transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+              cursor: 'pointer', zIndex: c.isGrouped ? 1 : 10
+            }} />
         ))}
       </div>
+    </>
+  );
+}
+
+// 2. メインの App コンポーネント
+export default function App() {
+  const [unit, setUnit] = useState(4);
+  const [count, setCount] = useState(6);
+
+  return (
+    <div className="container" style={{ padding: '20px' }}>
+      <h2>Copic Builder</h2>
+      <div style={{ marginBottom: '20px' }}>
+        <input type="number" value={unit} onChange={e => setUnit(Number(e.target.value))} />
+        <span> × </span>
+        <input type="number" value={count} onChange={e => setCount(Number(e.target.value))} />
+      </div>
+
+      {/* ここがポイント！ 
+        key に [unit, count] を指定することで、値が変わるたびに 
+        CopicCanvas が「新品」に作り直され、Stateが自動でリセットされます。
+      */}
+      <CopicCanvas key={`${unit}-${count}`} unit={unit} count={count} />
     </div>
   );
-} 
-
-export default App;
+}
