@@ -8,46 +8,32 @@ interface Props {
 
 export function SettingsView({ quiz, setQuiz, onStart }: Props) {
 
-  // 数値を変更するためのヘルパー関数
-  // 数値を変更するためのヘルパー関数
-  // 「常に1桁モード」の実装
   const handleChange = (key: keyof Quiz, value: string) => {
     let num = 0;
-
-    // ケース1: バックスペースで空になった場合 -> 0にする
     if (value === '') {
       num = 0;
-    } 
-    // ケース2: 何か入力された場合
-    else {
-      // 文字列の「一番最後に入力された文字」だけを取り出す
-      // 例: 現在「0」で「3」と打つと valueは "03" -> 最後の "3" を採用
-      // 例: 現在「4」で「5」と打つと valueは "45" -> 最後の "5" を採用 (上書き感覚)
+    } else {
       const lastChar = value.slice(-1);
-      
-      // それを数値にする
       num = Number(lastChar);
     }
 
-    // 安全策: NaNなら0、念のため0-9に収める
     if (isNaN(num)) num = 0;
-    
-    // 九九なので一桁(0-9)で十分！
-    // これにより "10" 以上の入力は物理的に不可能になります
     if (num > 9) num = 9; 
     if (num < 0) num = 0;
 
-    // 3. Stateを更新
-    // ここで num は必ず 0〜10 の整数になっています
-    // "01" という文字列が来ても Number("01") で 1 になるので、
-    // 次の再描画で「01」は消えて「1」になります。
-    setQuiz({
-      ...quiz,
-      [key]: num
-    });
+    // 新しい設定を作成
+    const newQuiz = { ...quiz, [key]: num };
+
+    // c (最初の数) が変わったら、b (目標) は自動的に c + 1 にする
+    if (key === 'c') {
+      // ただし b が 9 を超えないように制限（九九の範囲内）
+      newQuiz.b = Math.min(num + 1, 9);
+    }
+    // a (1かごの数) が変わった場合は、b, c はそのまま
+    
+    setQuiz(newQuiz);
   };
 
-  // UX向上: フォーカスした瞬間に数字を全選択する関数
   const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
     e.target.select();
   };
@@ -55,71 +41,73 @@ export function SettingsView({ quiz, setQuiz, onStart }: Props) {
   return (
     <div className="view-container" style={{ padding: '20px', maxWidth: '500px', margin: '0 auto' }}>
       <h2>もんだいの せってい</h2>
-      <p>すきな数字を入れてね（10までだよ）</p>
+      <p>九九の学習：1つ増えるとどうなる？</p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', margin: '30px 0' }}>
         
-        {/* === a (1かごの数) の設定 === */}
+        {/* === a (1かごの数) === */}
         <div className="input-group">
           <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-            1かごに 何個？
+            1かごに 何個？ 
           </label>
           <input 
             type="number" 
             value={quiz.a} 
             onChange={(e) => handleChange('a', e.target.value)}
-            onFocus={handleFocus} // ← これを追加！クリックするとパッと全選択されます
-            min={0} // ブラウザのUI（矢印操作）用の制限
-            max={10}
+            onFocus={handleFocus}
+            min={1} max={9}
             style={{ padding: '10px', fontSize: '1.2rem', width: '100%' }}
           />
         </div>
 
-        {/* === c (最初のかご数) の設定 === */}
+        {/* === c (最初のかご数) === */}
         <div className="input-group">
           <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-            最初は かご何個から？
+            最初は かご何個から？ 
           </label>
           <input 
             type="number" 
             value={quiz.c} 
             onChange={(e) => handleChange('c', e.target.value)}
-            onFocus={handleFocus} // ← これを追加
-            min={0}
-            max={10}
+            onFocus={handleFocus}
+            min={1} max={8} // +1するので最大は8までにしておく
             style={{ padding: '10px', fontSize: '1.2rem', width: '100%' }}
           />
         </div>
 
-        {/* === b (目標のかご数) の設定 === */}
-        <div className="input-group">
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-            全部で かご何個にする？
+        {/* === b (目標) は自動計算なので入力不可にする === */}
+        <div className="input-group" style={{ opacity: 0.7 }}>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold', color: '#666' }}>
+            目標のかごの数
           </label>
-          <input 
-            type="number" 
-            value={quiz.b} 
-            onChange={(e) => handleChange('b', e.target.value)}
-            onFocus={handleFocus} // ← これを追加
-            min={0}
-            max={10}
-            style={{ padding: '10px', fontSize: '1.2rem', width: '100%' }}
-          />
+          <div style={{ 
+            padding: '10px', 
+            fontSize: '1.2rem', 
+            background: '#eee', 
+            borderRadius: '4px',
+            border: '1px solid #ccc'
+          }}>
+            <strong>{quiz.c + 1}</strong> 個
+          </div>
         </div>
 
       </div>
 
-      {/* プレビュー表示 */}
       <div style={{ 
-        background: '#f0f0f0', 
+        background: '#fff3cd', 
         padding: '15px', 
         borderRadius: '8px', 
         marginBottom: '20px',
         textAlign: 'center',
-        fontWeight: 'bold'
+        fontWeight: 'bold',
+        border: '2px solid #ffeeba'
       }}>
-        今の設定：<br/>
-        {quiz.a} × {quiz.c} → {quiz.a} × {quiz.b} を目指す！
+        今回のミッション：<br/>
+        {quiz.a} × {quiz.c} に<br/>
+        いくつかボールをたして<br/>
+        <span style={{ fontSize: '1.2em', color: '#d35400' }}>
+          {quiz.a} × {quiz.c + 1}
+        </span> を作ろう！
       </div>
 
       <button 
@@ -136,7 +124,7 @@ export function SettingsView({ quiz, setQuiz, onStart }: Props) {
           boxShadow: '0 4px 0 #2980b9'
         }}
       >
-        この問題ではじめる！
+        スタート！
       </button>
     </div>
   );
